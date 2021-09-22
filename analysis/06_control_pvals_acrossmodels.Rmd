@@ -1,0 +1,26 @@
+---
+title: "R Notebook"
+---
+
+Adjust p-vals
+
+```{r}
+rm(list=ls())
+
+# pvalues come from 05_control_pvals_sca.Rmd and 02_calculate_pvalues.Rmd
+
+# pvalues are listed in the following order: SCA, edgewise regression and BBS
+
+pvals.l <- list(anx_sens=c(0.0480, 0.062, 0.376),
+                anhedonia=c(0.049, 0.097, 0.264),
+                insomnia=c(0.058, 0.006, 0.041),
+                anx_arous=c(0.909, 0.009, 0.164),
+                negative_affect=c(0.449, 0.005),
+                ruminative_thought=c(0.351, 0.136, 0.015))
+
+for (symp in names(pvals.l)) {
+    print(symp)
+    print(p.adjust(pvals.l[[symp]], method='holm'))
+}
+```
+

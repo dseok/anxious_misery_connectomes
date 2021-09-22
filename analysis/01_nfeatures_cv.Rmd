@@ -1,0 +1,102 @@
+---
+title: "R Notebook"
+---
+
+Generate figures related to cor.test.inner for nfeatures
+
+```{r}
+library(rstudioapi)
+library(ggplot2)
+rm(list=ls())
+data_root <-  dirname(dirname(getActiveDocumentContext()$path))
+outdir <- file.path(data_root, 'outputs')
+
+# specify outnames
+outnames <- c('edgewise_nfeatures',
+              'bbs_nfeatures')
+
+data <- c()
+for (outname in outnames) {
+    tmp <- readRDS(file.path(outdir, outname, paste0(outname, '_output.rds')))
+    data <- rbind(data, tmp)
+}
+
+# assign model
+data$model <- ifelse(data$runmode=='edgewise', 'Edgewise regression',
+              ifelse(data$runmode=='bbs', 'BBS', NA))
+
+# change labels for symptoms
+data$symp <- as.character(data$symp)
+
+data$symp[data$symp=='negative_affect'] <- 'Negative affect'
+data$symp[data$symp=='insomnia'] <- 'Insomnia'
+data$symp[data$symp=='anhedonia'] <- 'Anhedonia'
+data$symp[data$symp=='anxious_arousal'] <- 'Anxious arousal'
+data$symp[data$symp=='anxiety_sensitivity'] <- 'Anxiety sensitivity'
+data$symp[data$symp=='ruminative_thought'] <- 'Ruminative thought'
+
+data$symp <- factor(data$symp, levels=c('Anxiety sensitivity',
+                                        'Anxious arousal', 
+                                        'Ruminative thought',
+                                        'Anhedonia',
+                                        'Insomnia',
+                                        'Negative affect'))
+
+# change nfeatures_pca to nfeatures if PCA
+data$nfeatures[data$model=='BBS'] <- data$nfeatures_pca[data$model=='BBS']
+
+# trim some features - instability of PCA
+data <- data[!(data$model=='BBS' & data$nfeatures %in% c(200, 400)),]
+```
+
+
+Generate one plot per model - vertical
+```{r}
+for (model in unique(data$model)) {
+    ondata <- data[data$model==model,]
+    p <- ggplot(ondata, aes(x=nfeatures, y=cor.test.inner)) +
+            geom_point()
+    p <- p + facet_grid(symp ~ model, switch='y')
+    
+    p <- p + scale_y_continuous(position='right',
+                           breaks = scales::pretty_breaks(n = 4)) +
+        geom_hline(yintercept=0, color='black') +
+            theme_bw() +
+            theme(
+                axis.title = element_blank(),
+                strip.text = element_blank(),
+                axis.text.x = element_text(size=22),
+                axis.text.y = element_text(size=18)
+            )
+    
+    # add vertical lines for the nfeatures selected
+    if (model=='BBS') {
+        p <- p + geom_vline(xintercept=max(ondata$nfeatures), color='red')
+    } else {
+        best_nfeatures <- rep(NA, 6)
+        names(best_nfeatures) <- unique(ondata$symp)
+        for (symp in unique(ondata$symp)) {
+            thisdata <- ondata[ondata$symp==symp,]
+            best_nfeatures[symp] <- thisdata$nfeatures[which(thisdata$cor.test.inner==max(thisdata$cor.test.inner))]
+        }
+        
+        p <- p +
+            geom_vline(data=ondata[ondata$symp=='Negative affect',], 
+                       aes(xintercept=best_nfeatures['Negative affect']), color='red') +
+            geom_vline(data=ondata[ondata$symp=='Insomnia',], 
+                       aes(xintercept=best_nfeatures['Insomnia']), color='red') +
+            geom_vline(data=ondata[ondata$symp=='Anhedonia',], 
+                       aes(xintercept=best_nfeatures['Anhedonia']), color='red') +
+            geom_vline(data=ondata[ondata$symp=='Anxious arousal',], 
+                       aes(xintercept=best_nfeatures['Anxious arousal']), color='red') +
+            geom_vline(data=ondata[ondata$symp=='Anxiety sensitivity',], 
+                       aes(xintercept=best_nfeatures['Anxiety sensitivity']), color='red') +
+            geom_vline(data=ondata[ondata$symp=='Ruminative thought',], 
+                       aes(xintercept=best_nfeatures['Ruminative thought']), color='red')
+    }
+    
+    print(p)
+    ggsave(file.path(dirname(getActiveDocumentContext()$path), paste0('01_nfeatures_cv_model-', model, '.tiff')), width=5, height=14, dpi=320)
+}
+
+```

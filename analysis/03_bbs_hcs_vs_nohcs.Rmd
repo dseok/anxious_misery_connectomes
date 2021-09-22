@@ -1,0 +1,58 @@
+---
+title: "R Notebook"
+---
+
+Create plot of BBS, w/HCs vs w/o HCs
+
+```{r}
+library(rstudioapi)
+library(ggplot2)
+library(reshape2)
+rm(list=ls())
+root <- dirname(dirname(getActiveDocumentContext()$path))
+
+data.nohcs <- readRDS(file.path(root, 'outputs/bbs_nohcs/bbs_nohcs_output.rds'))
+data.hcs <- readRDS(file.path(root, 'outputs/bbs_permutation/bbs_permutation_output.rds'))
+data.hcs <- data.hcs[data.hcs$sim==0,]
+
+data <- rbind(data.nohcs, data.hcs)
+data.m <- melt(data, id.vars=c('symp', 'use_hcs_pca'))
+plot.df <- data.m[data.m$variable=='cor.test',]
+plot.df$value <- as.numeric(plot.df$value)
+```
+
+```{r}
+# plot
+
+# replace symptoms with correct titles
+titles <- c(anhedonia='Anhedonia',
+            anxiety_sensitivity='Anxiety sensitivity',
+            anxious_arousal='Anxious arousal',
+            insomnia='Insomnia',
+            depression='Negative affect',
+            ruminative_thought='Ruminative thought')
+title.df <- data.frame(symp=names(titles), title=titles)
+plot.df <- merge(plot.df, title.df)
+title.df$title <- factor(title.df$title, levels=c('Anxiety sensitivity', 'Anhedonia', 'Insomnia', 'Anxious arousal', 'negative affect', 'Ruminative thought'))
+
+# fix fill
+plot.df$variable <- ifelse(plot.df$use_hcs_pca==1, 'BBS w/HCs', 'BBS w/o HCs')
+
+#tiff(file.path(fig.dir, 'sfig4.tiff'),
+#               width=7, height=6, units='in', res=400)
+ggplot(plot.df, aes(x=title, y=value, fill=variable)) +
+    geom_col(position='dodge') +
+    labs(y='Pearson correlation, testing dataset', x='') +
+    theme_light() +
+    theme(
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
+        legend.title=element_blank(),
+        legend.text = element_text(size=14),
+        
+        axis.title.y = element_text(size=14),
+        axis.text.x=element_text(size=14, angle=90, color='black')
+    )
+#dev.off()
+```
+

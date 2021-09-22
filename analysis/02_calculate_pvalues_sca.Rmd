@@ -1,0 +1,67 @@
+---
+title: "R Notebook"
+---
+
+Compute SCA p-values
+
+```{r}
+library(rstudioapi)
+library(reshape2)
+library(jmuOutlier)
+library(dplyr)
+rm(list=ls())
+root <- dirname(dirname(getActiveDocumentContext()$path))
+data.raw <- readRDS(file.path(root, 'data/data_raw.rds'))
+data.clin <- read.csv(file.path(root, 'data/symptom_scores.csv'), stringsAsFactors=FALSE)
+data.sca <- read.csv(file.path(root, 'data/sca_results.csv'), stringsAsFactors=FALSE)
+sublist <- read.csv(file.path(root, 'data/sublist.csv'), stringsAsFactors=FALSE)
+
+# gather and merge
+data.clin.m <- melt(data.clin, id.vars='sub', variable.name='symp', value.name='severity')
+demovars <- data.raw$demovars
+motionvars <- data.raw$motionvars
+
+# merge
+fulldata <- merge(data.sca, data.clin.m, by=c('sub', 'symp'))
+fulldata <- merge(fulldata, sublist, by='sub')
+fulldata <- merge(fulldata, demovars, by='sub')
+fulldata <- merge(fulldata, motionvars, by='sub')
+```
+
+```{r}
+# loop over symps, seeds and masks
+outdata <- data.frame()
+for (symp in unique(fulldata$symp)) {
+    for (seed in unique(fulldata$seed[fulldata$symp==symp])) {
+        for (mask in unique(fulldata$mask[fulldata$symp==symp & fulldata$seed==seed])) {
+            ondata <- fulldata[fulldata$symp==symp & fulldata$seed==seed & fulldata$mask==mask,]
+            
+            # regress out age, sex and motion from zstat
+            lm1 <- lm(zstat ~ age + sex + meanRelRMS, data=ondata)
+            ondata$zstat <- residuals(lm1)
+            
+            lm1 <- lm(severity ~ zstat, data=ondata[ondata$split=='training',])
+            
+            y.train.hat <- predict(lm1, ondata[ondata$split=='training',])
+            y.test.hat <- predict(lm1, ondata[ondata$split=='testing',])
+            
+            outdata <- rbind(outdata,
+                             cbind(ondata[ondata$split=='training',], severity_predicted=y.train.hat),
+                             cbind(ondata[ondata$split=='testing',], severity_predicted=y.test.hat))
+        }
+    }
+}
+
+
+# calculate correlations
+set.seed(22)
+data.sum <- outdata %>%
+    group_by(split, symp, seed, mask) %>%
+    summarize(cor=cor(severity, severity_predicted), 
+              pval=perm.cor.test(severity, severity_predicted, num.sim=5000)$p.value)
+```
+
+```{r}
+data.sum[data.sum$split=='testing',]
+```
+

@@ -1,0 +1,60 @@
+---
+title: "R Notebook"
+---
+
+Extract results from nodewise SVR and plot in scatterplot
+
+```{r}
+library(rstudioapi)
+library(ggplot2)
+rm(list=ls())
+root <- dirname(dirname(getActiveDocumentContext()$path))
+fig.dir <- file.path(dirname(getActiveDocumentContext()$path), '04_scatterplots_bbs')
+dir.create(fig.dir)
+data <- readRDS(file.path(root, 'outputs/bbs_savefeaturespredictions/bbs_savefeaturespredictions_output.rds'))
+
+# also record correlation and p-values
+symp <- c('anhedonia', 'anxiety_sensitivity', 'anxious_arousal', 'insomnia', 'negative_affect', 'ruminative_thought')
+pval <- c(0.264, 0.376, 0.164, 0.041, 0.005, 0.015)
+pvals.df <- data.frame(symp, pval)
+```
+
+```{r}
+# plot scatterplots
+titles <- c(anhedonia='Anhedonia',
+            anxiety_sensitivity='Anxiety sensitivity',
+            anxious_arousal='Anxious arousal',
+            insomnia='Insomnia',
+            negative_affect='Negative affect',
+            ruminative_thought='Ruminative thought')
+
+for (symp in unique(data$symp)) {
+    ondata <- data[data$symp==symp,]
+    
+    # parse results
+    y_actual <- as.numeric(strsplit(as.character(ondata$y_actual.test), split=',')[[1]])
+    y_hat <- as.numeric(strsplit(as.character(ondata$y_hat.test), split=',')[[1]])
+    plot.df <- data.frame(y_actual, y_hat)
+    plot.df$severity_scaled <- scale(plot.df$y_actual)
+    plot.df$severity_predicted_scaled <- scale(plot.df$y_hat)
+
+    p <- ggplot(plot.df, aes(x=severity_scaled, y=severity_predicted_scaled)) +
+        geom_point() +
+        geom_smooth(method='lm', formula='y~x', se=FALSE)
+    p <- p + annotate('text', x=layer_scales(p)$x$range$range[1]+1.25, y=layer_scales(p)$y$range$range[2]-0.25,
+                      label=paste0('r = ', round(ondata$cor.test, digits=3),
+                                   '\n p (uncorrected) = ', round(pvals.df$pval[pvals.df$symp==symp], digits=3)),
+                      size=4) +
+        labs(x='Observed Severity', y='Predicted Severity') + 
+        theme_classic() +
+        theme(
+            plot.title=element_text(hjust=0.5),
+            
+            axis.title=element_text(size=16)
+        )
+    tiff(file.path(fig.dir, paste0('scatterplot_method-bbs_symp-', symp, '.tiff')),
+             width=4, height=4, units='in', res=200)
+    print(p)
+    dev.off()
+}
+```

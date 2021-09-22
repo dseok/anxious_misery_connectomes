@@ -1,0 +1,40 @@
+---
+title: "R Notebook"
+---
+
+Control p-values for SCA
+
+```{r}
+# taken from 02_calculate_pvalues_sca:
+```
+
+```{r}
+# anxiety_sensitivity:
+p.adjust(c(0.0160, 0.6318, 0.0916), method='holm')
+```
+
+```{r}
+# anxious arousal
+p.adjust(c(0.9630, 0.9126), method='holm')
+```
+
+```{r}
+# ruminative thought had only one cluster, so no correction is necesary
+0.3602
+```
+
+```{r}
+# anhedonia only had one cluster, so no correction is necessary
+0.0490
+```
+
+```{r}
+# negative affect had no significant clusters
+NA
+```
+
+```{r}
+# insomnia
+p.adjust(c(0.0584, 0.0876), method='holm')
+```
+

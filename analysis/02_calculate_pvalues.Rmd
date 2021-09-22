@@ -1,0 +1,51 @@
+---
+title: "R Notebook"
+---
+
+Compute p-values of multivariate models from permutation testing
+
+```{r}
+library(rstudioapi)
+root <- dirname(dirname(getActiveDocumentContext()$path))
+# read data
+data.edge.orig <- readRDS(file.path(root, 'outputs/edgewise_permutation/edgewise_permutation_output.rds'))
+data.bbs <- readRDS(file.path(root, 'outputs/bbs_permutation/bbs_permutation_output.rds'))
+
+# filter by edgewise by optimal nfeatures
+nfeatures.v <- c(negative_affect=140, insomnia=4600, anhedonia=500, anxious_arousal=1200, anxiety_sensitivity=500, ruminative_thought=3000)
+data.edge <- data.frame()
+
+symps <- names(nfeatures.v)
+
+for (symp in symps) {
+    data.edge <- rbind(data.edge, data.edge.orig[data.edge.orig$symp==symp & data.edge.orig$nfeatures==nfeatures.v[symp],])
+}
+
+```
+
+```{r}
+# compute (unadjusted) p-values for edgewise regression
+pvals <- rep(NA, 6)
+names(pvals) <- symps
+for (symp in symps) {
+    testcor <- data.edge$cor.test[data.edge$symp==symp & data.edge$sim==0]
+    permcor <- data.edge$cor.test[data.edge$symp==symp & data.edge$sim!=0]
+    
+    pvals[symp] <- mean(testcor < permcor, na.rm=TRUE)
+}
+pvals
+```
+
+```{r}
+# compute (unadjusted) p-values for BBS
+pvals <- rep(NA, 6)
+names(pvals) <- symps
+for (symp in symps) {
+    testcor <- data.bbs$cor.test[data.bbs$symp==symp & data.bbs$sim==0]
+    permcor <- data.bbs$cor.test[data.bbs$symp==symp & data.bbs$sim!=0]
+    
+    pvals[symp] <- mean(testcor < permcor, na.rm=TRUE)
+}
+pvals
+```
+
